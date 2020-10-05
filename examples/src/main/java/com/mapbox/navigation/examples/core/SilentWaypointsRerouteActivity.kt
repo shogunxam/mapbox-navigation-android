@@ -203,6 +203,7 @@ class SilentWaypointsRerouteActivity :
                     RouteOptions.builder().applyDefaultParams()
                         .accessToken(Utils.getMapboxAccessToken(applicationContext))
                         .coordinates(waypointsController.coordinates(originLocation))
+                        .waypointNames("start;finish")
                         .waypointIndices("0;${waypointsController.waypoints.size}")
                         .profile(DirectionsCriteria.PROFILE_DRIVING_TRAFFIC)
                         .build(),
