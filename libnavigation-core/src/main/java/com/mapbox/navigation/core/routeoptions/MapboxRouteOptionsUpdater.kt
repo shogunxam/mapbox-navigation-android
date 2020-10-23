@@ -109,7 +109,6 @@ class MapboxRouteOptionsUpdater(
         }
         return mutableListOf<String>().also { updatedWaypointNamesList ->
             var updatedStartWaypointNamesIndex = 0
-            routeOptions.waypointIndicesList()?.find { it < currentLegIndex }
             routeOptions.waypointIndicesList()?.forEachIndexed { indx, waypointIndex ->
                 if (waypointIndex <= currentLegIndex) {
                     updatedStartWaypointNamesIndex = indx
@@ -165,7 +164,7 @@ class MapboxRouteOptionsUpdater(
                     updatedStartWaypointIndicesIndex = indx
                 }
             }
-            updatedWaypointIndicesList.add(waypointIndicesList[updatedStartWaypointIndicesIndex])
+            updatedWaypointIndicesList.add(0)
             updatedWaypointIndicesList.addAll(
                 waypointIndicesList.subList(
                     updatedStartWaypointIndicesIndex + 1,
