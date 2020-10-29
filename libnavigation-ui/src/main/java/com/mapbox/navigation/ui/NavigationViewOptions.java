@@ -87,6 +87,9 @@ public abstract class NavigationViewOptions {
 
   public abstract boolean enableVanishingRouteLine();
 
+  @Nullable
+  public abstract String voiceInstructionLoaderBaseUrl();
+
   @AutoValue.Builder
   public abstract static class Builder {
 
@@ -177,6 +180,15 @@ public abstract class NavigationViewOptions {
      * @return this {@link Builder}
      */
     public abstract Builder isFallbackAlwaysEnabled(boolean isFallbackAlwaysEnabled);
+
+    /**
+     * Set the base URL for online voice instruction requests.
+     *
+     * If null, defaults to https://api.mapbox.com/.
+     *
+     * @return this {@link Builder}
+     */
+    public abstract Builder voiceInstructionLoaderBaseUrl(@Nullable String voiceInstructionLoaderBaseUrl);
 
     @NonNull
     public abstract NavigationViewOptions build();
