@@ -108,6 +108,10 @@
     <attr name="instructionViewDisableList" format="boolean"/>
   </declare-styleable>
 
+  <declare-styleable name="MapboxStyleSpeedLimitView" >
+    <attr name="speedLimitBackgroundColor" format="reference|color" />
+  </declare-styleable>
+
   <declare-styleable name="MapboxStyleSoundButton">
     <attr name="soundButtonPrimaryColor" format="reference|color"/>
     <attr name="soundButtonSecondaryColor" format="reference|color"/>

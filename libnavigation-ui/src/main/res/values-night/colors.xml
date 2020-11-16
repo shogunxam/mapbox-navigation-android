@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <!-- Default SpeedLimitView -->
+  <color name="mapbox_speed_limit_text_color">#333333</color>
+  <color name="mapbox_speed_limit_view_background">#EFEFEF</color>
+
   <!-- Default InstructionView -->
   <color name="mapbox_instruction_view_primary_background">@color/mapbox_navigation_view_color_banner_background_dark</color>
   <color name="mapbox_instruction_view_secondary_background">@color/mapbox_navigation_view_color_secondary_dark</color>

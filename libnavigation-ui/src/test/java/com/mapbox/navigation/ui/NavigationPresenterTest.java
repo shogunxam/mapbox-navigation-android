@@ -2,6 +2,9 @@ package com.mapbox.navigation.ui;
 
 import com.mapbox.api.directions.v5.models.DirectionsRoute;
 
+import com.mapbox.navigation.base.speed.model.SpeedLimit;
+import com.mapbox.navigation.base.speed.model.SpeedLimitSign;
+import com.mapbox.navigation.base.speed.model.SpeedLimitUnit;
 import com.mapbox.navigation.ui.internal.NavigationContract;
 import org.junit.Test;
 
@@ -177,5 +180,16 @@ public class NavigationPresenterTest {
     presenter.onRouteUpdate(directionsRoute);
 
     verify(view).startCamera(directionsRoute);
+  }
+
+  @Test
+  public void onSpeedLimitAvailable_mapSpeedLimitIsUpdated() {
+    SpeedLimit speedLimit = new SpeedLimit(56, SpeedLimitUnit.MILES_PER_HOUR, SpeedLimitSign.MUTCD);
+    NavigationContract.View view = mock(NavigationContract.View.class);
+    NavigationPresenter presenter = new NavigationPresenter(view);
+
+    presenter.onSpeedLimitAvailable(speedLimit);
+
+    verify(view).updateSpeed(speedLimit);
   }
 }

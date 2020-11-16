@@ -78,6 +78,10 @@
   <color name="mapbox_instruction_maneuver_view_primary">@color/mapbox_navigation_view_color_banner_maneuver_primary</color>
   <color name="mapbox_instruction_maneuver_view_secondary">@color/mapbox_navigation_view_color_banner_maneuver_secondary</color>
 
+  <!-- Default SpeedLimitView -->
+  <color name="mapbox_speed_limit_text_color">#333333</color>
+  <color name="mapbox_speed_limit_view_background">@color/mapbox_navigation_view_color_primary</color>
+
   <!-- Default SoundButton -->
   <color name="mapbox_sound_button_primary">@color/mapbox_navigation_view_color_primary</color>
   <color name="mapbox_sound_button_secondary">@color/mapbox_navigation_view_color_secondary</color>
