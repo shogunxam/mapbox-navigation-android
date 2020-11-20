@@ -1,7 +1,6 @@
 package com.mapbox.navigation.examples.core
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.SeekBar
@@ -27,9 +26,9 @@ import com.mapbox.navigation.core.fasterroute.FasterRouteObserver
 import com.mapbox.navigation.core.replay.MapboxReplayer
 import com.mapbox.navigation.core.replay.ReplayLocationEngine
 import com.mapbox.navigation.core.replay.history.CustomEventMapper
+import com.mapbox.navigation.core.replay.history.HistoryEventStream
 import com.mapbox.navigation.core.replay.history.ReplayEventBase
 import com.mapbox.navigation.core.replay.history.ReplayEventsObserver
-import com.mapbox.navigation.core.replay.history.ReplayHistoryMapper
 import com.mapbox.navigation.core.replay.history.ReplaySetRoute
 import com.mapbox.navigation.core.trip.session.MapMatcherResult
 import com.mapbox.navigation.core.trip.session.MapMatcherResultObserver
@@ -41,8 +40,6 @@ import com.mapbox.navigation.examples.utils.extensions.toPoint
 import com.mapbox.navigation.ui.camera.NavigationCamera
 import com.mapbox.navigation.ui.map.NavigationMapboxMap
 import kotlinx.android.synthetic.main.activity_replay_history_layout.*
-import kotlinx.android.synthetic.main.activity_replay_history_layout.mapView
-import kotlinx.android.synthetic.main.fragment_basic_navigation.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -51,11 +48,8 @@ import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.IOException
-import java.io.InputStream
 import java.lang.ref.WeakReference
-import java.nio.charset.Charset.forName
-import java.util.Collections
+import java.util.*
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
@@ -68,6 +62,7 @@ class ReplayHistoryActivity : AppCompatActivity() {
 
     // You choose your loading mechanism. Use Coroutines, ViewModels, RxJava, Threads, etc..
     private var loadNavigationJob: Job? = null
+    private var historyEventStream: HistoryEventStream? = null
 
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -102,9 +97,11 @@ class ReplayHistoryActivity : AppCompatActivity() {
     @SuppressLint("MissingPermission")
     private fun ReplayNavigationContext.handleHistoryFileSelected() {
         loadNavigationJob = CoroutineScope(Dispatchers.Main).launch {
-            val events = loadReplayHistory()
+            historyEventStream?.close()
             mapboxReplayer.clearEvents()
-            mapboxReplayer.pushEvents(events)
+            historyEventStream = openHistoryEventStream()
+            val replayEventBase = historyEventStream!!.read(10000)
+            mapboxReplayer.pushEvents(replayEventBase)
             mapboxNavigation.resetTripSession()
             mapboxReplayer.playFirstLocation()
             if (mapboxNavigation.getTripSessionState() == TripSessionState.STOPPED) {
@@ -119,12 +116,13 @@ class ReplayHistoryActivity : AppCompatActivity() {
             // Load map and style on Main dispatchers
             val deferredMapboxWithStyle = async { loadMapWithStyle() }
 
-            val replayEvents = loadReplayHistory()
-            val mapboxReplay = MapboxReplayer()
-                .pushEvents(replayEvents)
+            historyEventStream = openHistoryEventStream()
+            val replayEventBase = historyEventStream!!.read(10000)
+            val mapboxReplayer = MapboxReplayer()
+            mapboxReplayer.pushEvents(replayEventBase)
             if (!isActive) return@launch
 
-            val locationEngine = ReplayLocationEngine(mapboxReplay)
+            val locationEngine = ReplayLocationEngine(mapboxReplayer)
 
             // Await the map and we're ready for navigation
             val mapboxNavigation = createMapboxNavigation(locationEngine)
@@ -146,7 +144,7 @@ class ReplayHistoryActivity : AppCompatActivity() {
                 style,
                 mapboxNavigation,
                 navigationMapboxMap,
-                mapboxReplay
+                mapboxReplayer
             )
 
             callback(navigationContext)
@@ -161,23 +159,15 @@ class ReplayHistoryActivity : AppCompatActivity() {
         }
     }
 
-    private suspend fun loadReplayHistory(): List<ReplayEventBase> = withContext(Dispatchers.IO) {
-        HistoryFilesActivity.selectedHistory?.let {
-            val replayHistoryMapper = ReplayHistoryMapper(ReplayCustomEventMapper(), MapboxLogger)
-            replayHistoryMapper.mapToReplayEvents(it)
-        } ?: loadDefaultReplayHistory()
+    private suspend fun openHistoryEventStream(): HistoryEventStream = withContext(Dispatchers.IO) {
+        HistoryFilesActivity.selectedHistory ?: openDefaultHistoryEventStream()
     }
 
-    private suspend fun loadDefaultReplayHistory(): List<ReplayEventBase> =
-        withContext(Dispatchers.IO) {
-            val replayHistoryMapper = ReplayHistoryMapper(ReplayCustomEventMapper(), MapboxLogger)
-            val rideHistoryExample =
-                loadHistoryJsonFromAssets(
-                    this@ReplayHistoryActivity,
-                    "replay-history-activity.json"
-                )
-            replayHistoryMapper.mapToReplayEvents(rideHistoryExample)
-        }
+    private fun openDefaultHistoryEventStream(): HistoryEventStream {
+        val filename = "replay-history-activity.json"
+        val inputStream = this@ReplayHistoryActivity.assets.open(filename)
+        return HistoryEventStream(inputStream)
+    }
 
     private fun createMapboxNavigation(locationEngine: LocationEngine): MapboxNavigation {
         val mapboxNavigationOptions = MapboxNavigation
@@ -371,6 +361,7 @@ class ReplayHistoryActivity : AppCompatActivity() {
         super.onDestroy()
         loadNavigationJob?.cancelChildren()
         navigationContext?.apply {
+            historyEventStream?.close()
             mapboxReplayer.finish()
             mapboxNavigation.stopTripSession()
             mapboxNavigation.onDestroy()
@@ -392,23 +383,6 @@ private data class ReplayNavigationContext(
     val navigationMapboxMap: NavigationMapboxMap,
     val mapboxReplayer: MapboxReplayer
 )
-
-private fun loadHistoryJsonFromAssets(context: Context, fileName: String): String {
-    return try {
-        val inputStream: InputStream = context.assets.open(fileName)
-        val size: Int = inputStream.available()
-        val buffer = ByteArray(size)
-        inputStream.read(buffer)
-        inputStream.close()
-        String(buffer, forName("UTF-8"))
-    } catch (e: IOException) {
-        MapboxLogger.e(
-            Message("Your history file failed to open $fileName"),
-            e
-        )
-        throw e
-    }
-}
 
 private class ReplayCustomEventMapper : CustomEventMapper {
     override fun map(eventType: String, properties: Map<*, *>): ReplayEventBase? {

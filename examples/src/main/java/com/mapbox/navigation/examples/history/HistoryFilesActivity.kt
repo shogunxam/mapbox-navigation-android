@@ -7,6 +7,7 @@ import android.view.View.VISIBLE
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.snackbar.Snackbar
+import com.mapbox.navigation.core.replay.history.HistoryEventStream
 import com.mapbox.navigation.core.replay.history.ReplayHistoryDTO
 import com.mapbox.navigation.examples.R
 import kotlinx.android.synthetic.main.history_files_activity.*
@@ -16,7 +17,7 @@ class HistoryFilesActivity : AppCompatActivity() {
 
     companion object {
         val REQUEST_CODE: Int = 123
-        var selectedHistory: ReplayHistoryDTO? = null
+        var selectedHistory: HistoryEventStream? = null
             private set
     }
 
