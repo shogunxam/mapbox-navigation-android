@@ -3,15 +3,15 @@ package com.mapbox.navigation.examples.core
 import android.annotation.SuppressLint
 import android.location.Location
 import android.os.Bundle
-import android.view.View
 import android.view.View.GONE
 import android.view.View.VISIBLE
+import android.widget.SeekBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.snackbar.Snackbar.LENGTH_SHORT
 import com.mapbox.android.core.location.LocationEngineCallback
-import com.mapbox.android.core.location.LocationEngineRequest
+import com.mapbox.android.core.location.LocationEngineProvider
 import com.mapbox.android.core.location.LocationEngineResult
 import com.mapbox.api.directions.v5.DirectionsCriteria
 import com.mapbox.api.directions.v5.models.DirectionsRoute
@@ -28,6 +28,10 @@ import com.mapbox.navigation.base.trip.model.RouteProgress
 import com.mapbox.navigation.core.MapboxNavigation
 import com.mapbox.navigation.core.directions.session.RoutesObserver
 import com.mapbox.navigation.core.directions.session.RoutesRequestCallback
+import com.mapbox.navigation.core.replay.MapboxReplayer
+import com.mapbox.navigation.core.replay.ReplayLocationEngine
+import com.mapbox.navigation.core.replay.route.ReplayProgressObserver
+import com.mapbox.navigation.core.replay.route.ReplayRouteMapper
 import com.mapbox.navigation.core.reroute.RerouteController
 import com.mapbox.navigation.core.reroute.RerouteState
 import com.mapbox.navigation.core.trip.session.LocationObserver
@@ -43,32 +47,32 @@ import com.mapbox.navigation.ui.map.NavigationMapboxMap
 import kotlinx.android.synthetic.main.activity_waypoints_reroute_layout.btnReroute
 import kotlinx.android.synthetic.main.activity_waypoints_reroute_layout.container
 import kotlinx.android.synthetic.main.activity_waypoints_reroute_layout.mapView
+import kotlinx.android.synthetic.main.activity_waypoints_reroute_layout.seekBar
+import kotlinx.android.synthetic.main.activity_waypoints_reroute_layout.seekBarText
 import kotlinx.android.synthetic.main.activity_waypoints_reroute_layout.startNavigation
 import timber.log.Timber
 import java.lang.ref.WeakReference
+import java.util.Collections
 
 /**
  * This activity shows how to:
- * - add waypoints to the route;
+ * - add silent waypoints to the route;
  * - manually invoke reroute;
  * - observe reroute events with the Navigation SDK's [RoutesObserver].
+ * - the Navigation SDK's route replay infrastructure
  */
-class WaypointsRerouteActivity :
+class SilentWaypointsRerouteActivity :
     AppCompatActivity(),
     OnMapReadyCallback,
     OffRouteObserver,
     RerouteController.RerouteStateObserver {
-
-    companion object {
-        private const val DEFAULT_FASTEST_INTERVAL = 500L
-        private const val DEFAULT_ENGINE_REQUEST_INTERVAL = 1000L
-    }
 
     private var mapboxNavigation: MapboxNavigation? = null
     private var navigationMapboxMap: NavigationMapboxMap? = null
     private var directionRoute: DirectionsRoute? = null
     private val routeSettings = CoordinatesHolder()
     private val waypointsController = WaypointsController()
+    private val mapboxReplayer = MapboxReplayer()
 
     private val locationListenerCallback = MyLocationEngineCallback(this)
     private val tripSessionStateObserver = object : TripSessionStateObserver {
@@ -76,12 +80,9 @@ class WaypointsRerouteActivity :
             when (tripSessionState) {
                 TripSessionState.STARTED -> {
                     startNavigation.visibility = GONE
-                    stopLocationUpdates()
-                    mapboxNavigation?.registerRouteProgressObserver(routeProgressObserver)
                 }
                 TripSessionState.STOPPED -> {
                     waypointsController.clear()
-                    startLocationUpdates()
                     navigationMapboxMap?.hideRoute()
                     updateCameraOnNavigationStateChange(false)
                 }
@@ -91,11 +92,6 @@ class WaypointsRerouteActivity :
 
     private val routeObserver = object : RoutesObserver {
         override fun onRoutesChanged(routes: List<DirectionsRoute>) {
-            startNavigation.visibility = if (routes.isNotEmpty()) {
-                VISIBLE
-            } else {
-                GONE
-            }
             directionRoute = routes.firstOrNull()
             navigationMapboxMap?.drawRoutes(routes)
         }
@@ -107,6 +103,11 @@ class WaypointsRerouteActivity :
     private val routesReqCallback = object : RoutesRequestCallback {
         override fun onRoutesReady(routes: List<DirectionsRoute>) {
             Timber.d("route request success $routes")
+            startNavigation.visibility = if (routes.isNotEmpty()) {
+                VISIBLE
+            } else {
+                GONE
+            }
         }
 
         override fun onRoutesRequestFailure(throwable: Throwable, routeOptions: RouteOptions) {
@@ -138,6 +139,7 @@ class WaypointsRerouteActivity :
 
         val mapboxNavigationOptions = MapboxNavigation
             .defaultNavigationOptionsBuilder(this, Utils.getMapboxAccessToken(this))
+            .locationEngine(ReplayLocationEngine(mapboxReplayer))
             .build()
 
         mapboxNavigation = MapboxNavigation(mapboxNavigationOptions)
@@ -153,8 +155,10 @@ class WaypointsRerouteActivity :
             registerTripSessionStateObserver(tripSessionStateObserver)
             registerRoutesObserver(routeObserver)
             registerRouteProgressObserver(routeProgressObserver)
-            registerOffRouteObserver(this@WaypointsRerouteActivity)
-            getRerouteController()?.registerRerouteStateObserver(this@WaypointsRerouteActivity)
+            registerOffRouteObserver(this@SilentWaypointsRerouteActivity)
+            getRerouteController()?.registerRerouteStateObserver(
+                this@SilentWaypointsRerouteActivity
+            )
         }
     }
 
@@ -175,15 +179,17 @@ class WaypointsRerouteActivity :
             unregisterTripSessionStateObserver(tripSessionStateObserver)
             unregisterRouteProgressObserver(routeProgressObserver)
             unregisterRoutesObserver(routeObserver)
-            unregisterOffRouteObserver(this@WaypointsRerouteActivity)
-            getRerouteController()?.unregisterRerouteStateObserver(this@WaypointsRerouteActivity)
+            unregisterOffRouteObserver(this@SilentWaypointsRerouteActivity)
+            getRerouteController()?.unregisterRerouteStateObserver(
+                this@SilentWaypointsRerouteActivity
+            )
         }
-        stopLocationUpdates()
         mapView.onStop()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        mapboxReplayer.finish()
         mapboxNavigation?.stopTripSession()
         mapboxNavigation?.onDestroy()
         mapView.onDestroy()
@@ -200,14 +206,16 @@ class WaypointsRerouteActivity :
             mapboxMap.moveCamera(CameraUpdateFactory.zoomTo(15.0))
             navigationMapboxMap = NavigationMapboxMap(mapView, mapboxMap, this, true)
 
-            mapboxNavigation?.navigationOptions?.locationEngine?.getLastLocation(
-                locationListenerCallback
-            )
+            // Center the map at current location. Using LocationEngineProvider because the
+            // replay engine won't have your last location.
+            LocationEngineProvider
+                .getBestLocationEngine(this)
+                .getLastLocation(locationListenerCallback)
 
             directionRoute?.let {
                 navigationMapboxMap?.drawRoute(it)
                 mapboxNavigation?.setRoutes(listOf(it))
-                startNavigation.visibility = View.VISIBLE
+                startNavigation.visibility = VISIBLE
             }
         }
 
@@ -237,16 +245,18 @@ class WaypointsRerouteActivity :
 
     @SuppressLint("MissingPermission")
     private fun initListeners() {
+        setupReplayControls()
         startNavigation.setOnClickListener {
             updateCameraOnNavigationStateChange(true)
             navigationMapboxMap?.addProgressChangeListener(mapboxNavigation!!)
             if (mapboxNavigation?.getRoutes()?.isNotEmpty() == true) {
                 navigationMapboxMap?.startCamera(mapboxNavigation?.getRoutes()!![0])
             }
+            mapboxNavigation?.registerRouteProgressObserver(ReplayProgressObserver(mapboxReplayer))
             mapboxNavigation?.startTripSession()
-            btnReroute.visibility = View.VISIBLE
-            startNavigation.visibility = View.GONE
-            stopLocationUpdates()
+            btnReroute.visibility = VISIBLE
+            startNavigation.visibility = GONE
+            mapboxReplayer.play()
         }
         btnReroute.setOnClickListener {
             mapboxNavigation?.getRerouteController()?.reroute(
@@ -258,24 +268,20 @@ class WaypointsRerouteActivity :
         }
     }
 
-    @SuppressLint("MissingPermission")
-    private fun startLocationUpdates() {
-        val requestLocationUpdateRequest =
-            LocationEngineRequest.Builder(DEFAULT_ENGINE_REQUEST_INTERVAL)
-                .setFastestInterval(DEFAULT_FASTEST_INTERVAL)
-                .setPriority(LocationEngineRequest.PRIORITY_HIGH_ACCURACY)
-                .build()
+    private fun setupReplayControls() {
+        seekBar.max = 4
+        seekBar.progress = 1
+        seekBarText.text = getString(R.string.replay_playback_speed_seekbar, seekBar.progress)
+        seekBar.setOnSeekBarChangeListener(
+            object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                    mapboxReplayer.playbackSpeed(progress.toDouble())
+                    seekBarText.text = getString(R.string.replay_playback_speed_seekbar, progress)
+                }
 
-        mapboxNavigation?.navigationOptions?.locationEngine?.requestLocationUpdates(
-            requestLocationUpdateRequest,
-            locationListenerCallback,
-            mainLooper
-        )
-    }
-
-    private fun stopLocationUpdates() {
-        mapboxNavigation?.navigationOptions?.locationEngine?.removeLocationUpdates(
-            locationListenerCallback
+                override fun onStartTrackingTouch(seekBar: SeekBar) {}
+                override fun onStopTrackingTouch(seekBar: SeekBar) {}
+            }
         )
     }
 
@@ -324,26 +330,31 @@ class WaypointsRerouteActivity :
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
-    private class MyLocationEngineCallback(activity: WaypointsRerouteActivity) :
+    private class MyLocationEngineCallback(activity: SilentWaypointsRerouteActivity) :
         LocationEngineCallback<LocationEngineResult> {
 
         private val activityRef = WeakReference(activity)
 
         override fun onSuccess(result: LocationEngineResult?) {
-            result?.locations?.firstOrNull()?.let {
-                val activity = activityRef.get() ?: return@let
-                activity.navigationMapboxMap?.updateLocation(result.lastLocation)
+            result?.locations?.firstOrNull()?.let { location ->
+                activityRef.get()?.let { activity ->
+                    val locationEvent = ReplayRouteMapper.mapToUpdateLocation(0.0, location)
+                    val locationEventList = Collections.singletonList(locationEvent)
+                    activity.mapboxReplayer.pushEvents(locationEventList)
+                    activity.mapboxReplayer.play()
+                    activity.navigationMapboxMap?.updateLocation(result.lastLocation)
+                }
             }
         }
 
         override fun onFailure(exception: Exception) {
         }
     }
+}
 
-    private class CoordinatesHolder {
-        var currentLocation: Location = Location("InternalProvider")
-        var destination: Point = Point.fromLngLat(0.0, 0.0)
-    }
+private class CoordinatesHolder {
+    var currentLocation: Location = Location("InternalProvider")
+    var destination: Point = Point.fromLngLat(0.0, 0.0)
 }
 
 private class WaypointsController {
