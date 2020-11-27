@@ -40,13 +40,15 @@ class MapboxRouteOptionsUpdater(
 
         val optionsBuilder = routeOptions.toBuilder()
         val coordinates = routeOptions.coordinates()
+        val remainingWaypoints = routeProgress.remainingWaypoints
 
         routeProgress.currentLegProgress?.legIndex?.let { index ->
             optionsBuilder
                 .coordinates(
-                    coordinates.drop(index + 1).toMutableList().apply {
-                        add(0, Point.fromLngLat(location.longitude, location.latitude))
-                    }
+                    coordinates
+                        .drop(coordinates.size - remainingWaypoints).toMutableList().apply {
+                            add(0, Point.fromLngLat(location.longitude, location.latitude))
+                        }
                 )
                 .bearingsList(
                     let {
@@ -91,9 +93,24 @@ class MapboxRouteOptionsUpdater(
                         }
                     }
                 )
-                .waypointNamesList(getUpdatedWaypointNamesList(routeOptions, index))
-                .waypointTargetsList(getUpdatedWaypointTargetsList(routeOptions, index))
-                .waypointIndicesList(getUpdatedWaypointIndicesList(routeOptions, index))
+                .waypointNamesList(
+                    getUpdatedWaypointNamesList(
+                        routeOptions,
+                        coordinates.size - remainingWaypoints - 1
+                    )
+                )
+                .waypointTargetsList(
+                    getUpdatedWaypointTargetsList(
+                        routeOptions,
+                        coordinates.size - remainingWaypoints - 1
+                    )
+                )
+                .waypointIndicesList(
+                    getUpdatedWaypointIndicesList(
+                        routeOptions,
+                        coordinates.size - remainingWaypoints - 1
+                    )
+                )
         }
 
         return RouteOptionsUpdater.RouteOptionsResult.Success(optionsBuilder.build())
@@ -101,7 +118,7 @@ class MapboxRouteOptionsUpdater(
 
     private fun getUpdatedWaypointNamesList(
         routeOptions: RouteOptions,
-        currentLegIndex: Int
+        lastPassedWaypointIndex: Int
     ): MutableList<String> {
         val waypointNamesList = routeOptions.waypointNamesList()
         if (waypointNamesList.isNullOrEmpty()) {
@@ -110,7 +127,7 @@ class MapboxRouteOptionsUpdater(
         return mutableListOf<String>().also { updatedWaypointNamesList ->
             var updatedStartWaypointNamesIndex = 0
             routeOptions.waypointIndicesList()?.forEachIndexed { indx, waypointIndex ->
-                if (waypointIndex <= currentLegIndex) {
+                if (waypointIndex <= lastPassedWaypointIndex) {
                     updatedStartWaypointNamesIndex = indx
                 }
             }
@@ -126,7 +143,7 @@ class MapboxRouteOptionsUpdater(
 
     private fun getUpdatedWaypointTargetsList(
         routeOptions: RouteOptions,
-        currentLegIndex: Int
+        lastPassedWaypointIndex: Int
     ): MutableList<Point> {
         val waypointTargetsList = routeOptions.waypointTargetsList()
         if (waypointTargetsList.isNullOrEmpty()) {
@@ -135,7 +152,7 @@ class MapboxRouteOptionsUpdater(
         return mutableListOf<Point>().also { updatedWaypointTargetsList ->
             var updatedStartWaypointTargetsIndex = 0
             routeOptions.waypointIndicesList()?.forEachIndexed { indx, waypointIndex ->
-                if (waypointIndex <= currentLegIndex) {
+                if (waypointIndex <= lastPassedWaypointIndex) {
                     updatedStartWaypointTargetsIndex = indx
                 }
             }
@@ -151,7 +168,7 @@ class MapboxRouteOptionsUpdater(
 
     private fun getUpdatedWaypointIndicesList(
         routeOptions: RouteOptions,
-        currentLegIndex: Int
+        lastPassedWaypointIndex: Int
     ): MutableList<Int> {
         val waypointIndicesList = routeOptions.waypointIndicesList()
         if (waypointIndicesList.isNullOrEmpty()) {
@@ -160,7 +177,7 @@ class MapboxRouteOptionsUpdater(
         return mutableListOf<Int>().also { updatedWaypointIndicesList ->
             var updatedStartWaypointIndicesIndex = 0
             routeOptions.waypointIndicesList()?.forEachIndexed { indx, waypointIndex ->
-                if (waypointIndex <= currentLegIndex) {
+                if (waypointIndex <= lastPassedWaypointIndex) {
                     updatedStartWaypointIndicesIndex = indx
                 }
             }
@@ -169,7 +186,7 @@ class MapboxRouteOptionsUpdater(
                 waypointIndicesList.subList(
                     updatedStartWaypointIndicesIndex + 1,
                     waypointIndicesList.size
-                ).map { it - currentLegIndex }
+                ).map { it - lastPassedWaypointIndex }
             )
         }
     }

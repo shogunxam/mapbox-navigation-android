@@ -116,7 +116,7 @@ object MapboxNativeNavigatorImpl : MapboxNativeNavigator {
             TripStatus(
                 status.location.toLocation(),
                 status.key_points.map { it.toLocation() },
-                navigatorMapper.getRouteProgress(route, routeBufferGeoJson, status),
+                navigatorMapper.getRouteProgress(route, routeBufferGeoJson, status, navigator!!),
                 status.routeState == RouteState.OFF_ROUTE,
                 status
             )

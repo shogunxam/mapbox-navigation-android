@@ -76,12 +76,14 @@ internal class NavigatorMapper {
     fun getRouteProgress(
         directionsRoute: DirectionsRoute?,
         routeBufferGeoJson: Geometry?,
-        status: NavigationStatus
+        status: NavigationStatus,
+        navigator: Navigator
     ): RouteProgress? {
-        return status.getRouteProgress(directionsRoute, routeBufferGeoJson)
+        return status.getRouteProgress(navigator, directionsRoute, routeBufferGeoJson)
     }
 
     private fun NavigationStatus.getRouteProgress(
+        navigator: Navigator,
         route: DirectionsRoute?,
         routeBufferGeoJson: Geometry?
     ): RouteProgress? {
@@ -125,7 +127,7 @@ internal class NavigatorMapper {
                         activeGuidanceInfo.routeProgress.fractionTraveled.toFloat()
                     )
 
-                    routeProgressBuilder.remainingWaypoints(legs.size - (legIndex + 1))
+                    routeProgressBuilder.remainingWaypoints(navigator.remainingWaypoints().size)
                 }
 
                 ifNonNull(currentLeg?.steps()) { steps ->
