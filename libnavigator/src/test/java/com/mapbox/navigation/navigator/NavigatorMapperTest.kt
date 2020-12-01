@@ -96,7 +96,8 @@ class NavigatorMapperTest {
         val routeProgress = navigatorMapper.getRouteProgress(
             directionsRoute,
             null,
-            navigationStatus
+            navigationStatus,
+            mockk(relaxed = true)
         )
 
         assertEquals(stepProgress, routeProgress!!.currentLegProgress!!.currentStepProgress)
