@@ -7,7 +7,7 @@ import com.mapbox.navigator.ActiveGuidanceMode
 import com.mapbox.navigator.ActiveGuidanceOptions
 import io.mockk.every
 import io.mockk.mockk
-import org.junit.Assert
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ActiveGuidanceOptionsMapperTest {
@@ -20,7 +20,7 @@ class ActiveGuidanceOptionsMapperTest {
 
         val drivingPolyline6 = ActiveGuidanceOptionsMapper.mapFrom(directionsRoute)
 
-        Assert.assertEquals(
+        assertEquals(
             ActiveGuidanceOptions(
                 ActiveGuidanceMode.KDRIVING,
                 ActiveGuidanceGeometryEncoding.KPOLYLINE6,
@@ -36,7 +36,7 @@ class ActiveGuidanceOptionsMapperTest {
 
         val drivingPolyline6 = ActiveGuidanceOptionsMapper.mapFrom(directionsRoute)
 
-        Assert.assertEquals(
+        assertEquals(
             ActiveGuidanceOptions(
                 ActiveGuidanceMode.KDRIVING,
                 ActiveGuidanceGeometryEncoding.KPOLYLINE6,
