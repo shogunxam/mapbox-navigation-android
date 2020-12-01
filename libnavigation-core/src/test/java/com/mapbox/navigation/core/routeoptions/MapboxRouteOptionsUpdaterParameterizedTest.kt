@@ -22,7 +22,7 @@ import org.junit.runners.Parameterized
 class MapboxRouteOptionsUpdaterParameterizedTest(
     private val initWaypointNames: String,
     private val initWaypointIndices: String,
-    private val currentLegIndex: Int,
+    private val remainingWaypoints: Int,
     private val expectedWaypointNames: String,
     private val expectedWaypointIndices: String
 ) {
@@ -32,30 +32,30 @@ class MapboxRouteOptionsUpdaterParameterizedTest(
         @JvmStatic
         @Parameterized.Parameters
         fun data() = listOf(
-            arrayOf("start;finish", "0;6", 0, "start;finish", "0;6"),
-            arrayOf("start;finish", "0;6", 2, "start;finish", "0;4"),
-            arrayOf("start;finish", "0;6", 5, "start;finish", "0;1"),
-            arrayOf("start;mid;finish", "0;2;6", 1, "start;mid;finish", "0;1;5"),
-            arrayOf("start;mid;finish", "0;2;6", 2, "mid;finish", "0;4"),
+            arrayOf("start;finish", "0;6", 6, "start;finish", "0;6"),
+            arrayOf("start;finish", "0;6", 4, "start;finish", "0;4"),
+            arrayOf("start;finish", "0;6", 1, "start;finish", "0;1"),
+            arrayOf("start;mid;finish", "0;2;6", 5, "start;mid;finish", "0;1;5"),
+            arrayOf("start;mid;finish", "0;2;6", 4, "mid;finish", "0;4"),
             arrayOf("start;mid;finish", "0;2;6", 3, "mid;finish", "0;3"),
-            arrayOf("start;mid1;mid2;finish", "0;2;4;6", 1, "start;mid1;mid2;finish", "0;1;3;5"),
-            arrayOf("start;mid1;mid2;finish", "0;2;4;6", 2, "mid1;mid2;finish", "0;2;4"),
+            arrayOf("start;mid1;mid2;finish", "0;2;4;6", 5, "start;mid1;mid2;finish", "0;1;3;5"),
+            arrayOf("start;mid1;mid2;finish", "0;2;4;6", 4, "mid1;mid2;finish", "0;2;4"),
             arrayOf("start;mid1;mid2;finish", "0;2;4;6", 3, "mid1;mid2;finish", "0;1;3"),
-            arrayOf("start;mid1;mid2;finish", "0;2;4;6", 4, "mid2;finish", "0;2"),
-            arrayOf("start;mid1;mid2;finish", "0;2;4;6", 5, "mid2;finish", "0;1"),
-            arrayOf("start;mid1;mid2;finish", "0;2;3;6", 2, "mid1;mid2;finish", "0;1;4"),
+            arrayOf("start;mid1;mid2;finish", "0;2;4;6", 2, "mid2;finish", "0;2"),
+            arrayOf("start;mid1;mid2;finish", "0;2;4;6", 1, "mid2;finish", "0;1"),
+            arrayOf("start;mid1;mid2;finish", "0;2;3;6", 4, "mid1;mid2;finish", "0;1;4"),
             arrayOf("start;mid1;mid2;finish", "0;2;3;6", 3, "mid2;finish", "0;3"),
             arrayOf(
                 "start;mid1;mid2;mid3;mid4;mid5;finish",
                 "0;1;2;3;4;5;6",
-                0,
+                6,
                 "start;mid1;mid2;mid3;mid4;mid5;finish",
                 "0;1;2;3;4;5;6"
             ),
             arrayOf(
                 "start;mid1;mid2;mid3;mid4;mid5;finish",
                 "0;1;2;3;4;5;6",
-                4,
+                2,
                 "mid4;mid5;finish",
                 "0;1;2"
             )
@@ -87,8 +87,8 @@ class MapboxRouteOptionsUpdaterParameterizedTest(
             .build()
         val routeProgress: RouteProgress = mockk(relaxed = true)
         val currentLegProgress: RouteLegProgress = mockk(relaxed = true)
-        every { currentLegProgress.legIndex } returns currentLegIndex
         every { routeProgress.currentLegProgress } returns currentLegProgress
+        every { routeProgress.remainingWaypoints } returns remainingWaypoints
 
         val updatedRouteOptions =
             routeRefreshAdapter.update(routeOptions, routeProgress, location)
