@@ -44,12 +44,12 @@ import com.mapbox.navigation.examples.utils.Utils
 import com.mapbox.navigation.examples.utils.extensions.toPoint
 import com.mapbox.navigation.ui.camera.NavigationCamera
 import com.mapbox.navigation.ui.map.NavigationMapboxMap
-import kotlinx.android.synthetic.main.activity_waypoints_reroute_layout.btnReroute
-import kotlinx.android.synthetic.main.activity_waypoints_reroute_layout.container
-import kotlinx.android.synthetic.main.activity_waypoints_reroute_layout.mapView
-import kotlinx.android.synthetic.main.activity_waypoints_reroute_layout.seekBar
-import kotlinx.android.synthetic.main.activity_waypoints_reroute_layout.seekBarText
-import kotlinx.android.synthetic.main.activity_waypoints_reroute_layout.startNavigation
+import kotlinx.android.synthetic.main.activity_silent_waypoints_reroute_layout.btnReroute
+import kotlinx.android.synthetic.main.activity_silent_waypoints_reroute_layout.btnStartNavigation
+import kotlinx.android.synthetic.main.activity_silent_waypoints_reroute_layout.container
+import kotlinx.android.synthetic.main.activity_silent_waypoints_reroute_layout.mapView
+import kotlinx.android.synthetic.main.activity_silent_waypoints_reroute_layout.seekBar
+import kotlinx.android.synthetic.main.activity_silent_waypoints_reroute_layout.seekBarText
 import timber.log.Timber
 import java.lang.ref.WeakReference
 import java.util.Collections
@@ -79,7 +79,7 @@ class SilentWaypointsRerouteActivity :
         override fun onSessionStateChanged(tripSessionState: TripSessionState) {
             when (tripSessionState) {
                 TripSessionState.STARTED -> {
-                    startNavigation.visibility = GONE
+                    btnStartNavigation.visibility = GONE
                 }
                 TripSessionState.STOPPED -> {
                     waypointsController.clear()
@@ -103,7 +103,7 @@ class SilentWaypointsRerouteActivity :
     private val routesReqCallback = object : RoutesRequestCallback {
         override fun onRoutesReady(routes: List<DirectionsRoute>) {
             Timber.d("route request success $routes")
-            startNavigation.visibility = if (routes.isNotEmpty()) {
+            btnStartNavigation.visibility = if (routes.isNotEmpty()) {
                 VISIBLE
             } else {
                 GONE
@@ -133,7 +133,7 @@ class SilentWaypointsRerouteActivity :
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_waypoints_reroute_layout)
+        setContentView(R.layout.activity_silent_waypoints_reroute_layout)
         mapView.onCreate(savedInstanceState)
         mapView.getMapAsync(this)
 
@@ -215,7 +215,7 @@ class SilentWaypointsRerouteActivity :
             directionRoute?.let {
                 navigationMapboxMap?.drawRoute(it)
                 mapboxNavigation?.setRoutes(listOf(it))
-                startNavigation.visibility = VISIBLE
+                btnStartNavigation.visibility = VISIBLE
             }
         }
 
@@ -246,7 +246,7 @@ class SilentWaypointsRerouteActivity :
     @SuppressLint("MissingPermission")
     private fun initListeners() {
         setupReplayControls()
-        startNavigation.setOnClickListener {
+        btnStartNavigation.setOnClickListener {
             updateCameraOnNavigationStateChange(true)
             navigationMapboxMap?.addProgressChangeListener(mapboxNavigation!!)
             if (mapboxNavigation?.getRoutes()?.isNotEmpty() == true) {
@@ -255,7 +255,7 @@ class SilentWaypointsRerouteActivity :
             mapboxNavigation?.registerRouteProgressObserver(ReplayProgressObserver(mapboxReplayer))
             mapboxNavigation?.startTripSession()
             btnReroute.visibility = VISIBLE
-            startNavigation.visibility = GONE
+            btnStartNavigation.visibility = GONE
             mapboxReplayer.play()
         }
         btnReroute.setOnClickListener {
