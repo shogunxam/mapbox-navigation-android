@@ -1,7 +1,6 @@
 package com.mapbox.navigation.examples.core
 
 import android.annotation.SuppressLint
-import android.location.Location
 import android.os.Bundle
 import android.view.View.GONE
 import android.view.View.VISIBLE
@@ -16,15 +15,12 @@ import com.mapbox.android.core.location.LocationEngineResult
 import com.mapbox.api.directions.v5.DirectionsCriteria
 import com.mapbox.api.directions.v5.models.DirectionsRoute
 import com.mapbox.api.directions.v5.models.RouteOptions
-import com.mapbox.geojson.Point
 import com.mapbox.mapboxsdk.camera.CameraUpdateFactory
-import com.mapbox.mapboxsdk.geometry.LatLng
 import com.mapbox.mapboxsdk.location.modes.RenderMode
 import com.mapbox.mapboxsdk.maps.MapboxMap
 import com.mapbox.mapboxsdk.maps.OnMapReadyCallback
 import com.mapbox.mapboxsdk.maps.Style
 import com.mapbox.navigation.base.internal.extensions.applyDefaultParams
-import com.mapbox.navigation.base.trip.model.RouteProgress
 import com.mapbox.navigation.core.MapboxNavigation
 import com.mapbox.navigation.core.directions.session.RoutesObserver
 import com.mapbox.navigation.core.directions.session.RoutesRequestCallback
@@ -34,14 +30,12 @@ import com.mapbox.navigation.core.replay.route.ReplayProgressObserver
 import com.mapbox.navigation.core.replay.route.ReplayRouteMapper
 import com.mapbox.navigation.core.reroute.RerouteController
 import com.mapbox.navigation.core.reroute.RerouteState
-import com.mapbox.navigation.core.trip.session.LocationObserver
 import com.mapbox.navigation.core.trip.session.OffRouteObserver
-import com.mapbox.navigation.core.trip.session.RouteProgressObserver
 import com.mapbox.navigation.core.trip.session.TripSessionState
 import com.mapbox.navigation.core.trip.session.TripSessionStateObserver
 import com.mapbox.navigation.examples.R
+import com.mapbox.navigation.examples.core.utils.WaypointsController
 import com.mapbox.navigation.examples.utils.Utils
-import com.mapbox.navigation.examples.utils.extensions.toPoint
 import com.mapbox.navigation.ui.camera.NavigationCamera
 import com.mapbox.navigation.ui.map.NavigationMapboxMap
 import kotlinx.android.synthetic.main.activity_silent_waypoints_reroute_layout.btnReroute
@@ -70,7 +64,6 @@ class SilentWaypointsRerouteActivity :
     private var mapboxNavigation: MapboxNavigation? = null
     private var navigationMapboxMap: NavigationMapboxMap? = null
     private var directionRoute: DirectionsRoute? = null
-    private val routeSettings = CoordinatesHolder()
     private val waypointsController = WaypointsController()
     private val mapboxReplayer = MapboxReplayer()
 
@@ -96,10 +89,7 @@ class SilentWaypointsRerouteActivity :
             navigationMapboxMap?.drawRoutes(routes)
         }
     }
-    private val routeProgressObserver = object : RouteProgressObserver {
-        override fun onRouteProgressChanged(routeProgress: RouteProgress) {
-        }
-    }
+
     private val routesReqCallback = object : RoutesRequestCallback {
         override fun onRoutesReady(routes: List<DirectionsRoute>) {
             Timber.d("route request success $routes")
@@ -117,17 +107,6 @@ class SilentWaypointsRerouteActivity :
         override fun onRoutesRequestCanceled(routeOptions: RouteOptions) {
             Timber.d("route request canceled")
         }
-    }
-
-    private val locationObserver = object : LocationObserver {
-        override fun onRawLocationChanged(rawLocation: Location) {
-            routeSettings.currentLocation = rawLocation
-        }
-
-        override fun onEnhancedLocationChanged(
-            enhancedLocation: Location,
-            keyPoints: List<Location>
-        ) = Unit
     }
 
     @SuppressLint("MissingPermission")
@@ -151,10 +130,8 @@ class SilentWaypointsRerouteActivity :
         mapView.onStart()
 
         mapboxNavigation?.run {
-            registerLocationObserver(locationObserver)
             registerTripSessionStateObserver(tripSessionStateObserver)
             registerRoutesObserver(routeObserver)
-            registerRouteProgressObserver(routeProgressObserver)
             registerOffRouteObserver(this@SilentWaypointsRerouteActivity)
             getRerouteController()?.registerRerouteStateObserver(
                 this@SilentWaypointsRerouteActivity
@@ -175,9 +152,7 @@ class SilentWaypointsRerouteActivity :
     override fun onStop() {
         super.onStop()
         mapboxNavigation?.run {
-            unregisterLocationObserver(locationObserver)
             unregisterTripSessionStateObserver(tripSessionStateObserver)
-            unregisterRouteProgressObserver(routeProgressObserver)
             unregisterRoutesObserver(routeObserver)
             unregisterOffRouteObserver(this@SilentWaypointsRerouteActivity)
             getRerouteController()?.unregisterRerouteStateObserver(
@@ -202,9 +177,11 @@ class SilentWaypointsRerouteActivity :
 
     @SuppressLint("MissingPermission")
     override fun onMapReady(mapboxMap: MapboxMap) {
-        mapboxMap.setStyle(Style.MAPBOX_STREETS) { style ->
+        mapboxMap.setStyle(Style.MAPBOX_STREETS) { _ ->
             mapboxMap.moveCamera(CameraUpdateFactory.zoomTo(15.0))
-            navigationMapboxMap = NavigationMapboxMap(mapView, mapboxMap, this, true)
+            navigationMapboxMap = NavigationMapboxMap.Builder(mapView, mapboxMap, this)
+                .vanishRouteLineEnabled(true)
+                .build()
 
             // Center the map at current location. Using LocationEngineProvider because the
             // replay engine won't have your last location.
@@ -221,14 +198,12 @@ class SilentWaypointsRerouteActivity :
 
         mapboxMap.addOnMapLongClickListener { latLng ->
             waypointsController.add(latLng)
-            routeSettings.destination = latLng.toPoint()
             mapboxMap.locationComponent.lastKnownLocation?.let { originLocation ->
                 mapboxNavigation?.requestRoutes(
                     RouteOptions.builder().applyDefaultParams()
                         .accessToken(Utils.getMapboxAccessToken(applicationContext))
                         .coordinates(waypointsController.coordinates(originLocation))
                         .waypointIndices("0;${waypointsController.waypoints.size}")
-                        .alternatives(true)
                         .profile(DirectionsCriteria.PROFILE_DRIVING_TRAFFIC)
                         .build(),
                     routesReqCallback
@@ -262,6 +237,9 @@ class SilentWaypointsRerouteActivity :
             mapboxNavigation?.getRerouteController()?.reroute(
                 object : RerouteController.RoutesCallback {
                     override fun onNewRoutes(routes: List<DirectionsRoute>) {
+                        //  default implementation of the RerouteController automatically sets the route, no action needed
+                        // if you're implementing a custom RerouteController, you should invoke `MapboxNavigation#setRoute` here
+                        Timber.d("Reroute successful")
                     }
                 }
             )
@@ -309,8 +287,15 @@ class SilentWaypointsRerouteActivity :
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle?) {
-        super.onRestoreInstanceState(savedInstanceState)
-        directionRoute = Utils.getRouteFromBundle(savedInstanceState)
+        savedInstanceState?.let {
+            super.onRestoreInstanceState(savedInstanceState)
+            Utils.getRouteFromBundle(savedInstanceState).let { route ->
+                directionRoute = route
+                navigationMapboxMap?.drawRoute(route)
+                mapboxNavigation?.setRoutes(listOf(route))
+                btnStartNavigation.visibility = VISIBLE
+            }
+        }
     }
 
     override fun onOffRouteStateChanged(offRoute: Boolean) {
@@ -349,29 +334,5 @@ class SilentWaypointsRerouteActivity :
 
         override fun onFailure(exception: Exception) {
         }
-    }
-}
-
-private class CoordinatesHolder {
-    var currentLocation: Location = Location("InternalProvider")
-    var destination: Point = Point.fromLngLat(0.0, 0.0)
-}
-
-private class WaypointsController {
-    val waypoints = mutableListOf<Point>()
-
-    fun add(latLng: LatLng) {
-        waypoints.add(latLng.toPoint())
-    }
-
-    fun clear() {
-        waypoints.clear()
-    }
-
-    fun coordinates(originLocation: Location): List<Point> {
-        val coordinates = mutableListOf<Point>()
-        coordinates.add(originLocation.toPoint())
-        coordinates.addAll(waypoints)
-        return coordinates
     }
 }
