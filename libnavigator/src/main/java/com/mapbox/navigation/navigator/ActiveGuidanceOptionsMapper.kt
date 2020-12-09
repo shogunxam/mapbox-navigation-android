@@ -46,7 +46,7 @@ internal object ActiveGuidanceOptionsMapper {
         }
     }
 
-    private fun mapToWaypoints(routeOptions: RouteOptions?) =
+    private fun mapToWaypoints(routeOptions: RouteOptions?): List<Waypoint> =
         mutableListOf<Waypoint>().apply {
             routeOptions?.coordinates()?.forEachIndexed { index, point ->
                 routeOptions.waypointIndicesList()?.let { waypointIndices ->
